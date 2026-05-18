@@ -14,10 +14,20 @@
   "contributes": {
     "commands": [
       {
-        "command": "victorpenia.helloWorld",
-        "title": "Hello World"
+        "command": "gohu.openPanel",
+        "title": "Laravel Gohu"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Laravel Tools",
+      "properties": {
+        "laravelTools.projectPath": {
+          "type": "string",
+          "default": "",
+          "description": "projecturl"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",

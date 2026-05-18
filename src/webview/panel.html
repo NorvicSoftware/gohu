@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laravel Gohu</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #1e1e1e;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+        }
+
+        .panel-left {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 2px solid #007acc;
+            min-width: 0;
+        }
+
+        .panel-header {
+            background: #252526;
+            color: #cccccc;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 6px 10px;
+            border-bottom: 1px solid #3c3c3c;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            user-select: none;
+        }
+
+        .panel-header .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #007acc;
+        }
+
+        .btn-house {
+            background: transparent;
+            border: 1px solid #3c3c3c;
+            color: #ccc;
+            padding: 3px 7px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .btn-house:hover {
+            border-color: #007acc;
+            background: #2a2d2e;
+        }
+
+        .btn-run {
+            background: #28a745;
+            border: none;
+            color: #fff;
+            padding: 3px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            transition: background 0.2s;
+        }
+
+        .btn-run:hover {
+            background: #22923c;
+        }
+
+        .path-display {
+            margin-left: auto;
+            color: #6a9955;
+            font-size: 11px;
+            font-style: italic;
+            max-width: 220px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            opacity: 0.85;
+        }
+
+        #monaco-editor {
+            flex: 1;
+            width: 100%;
+        }
+
+        /* ── Draggable divider ── */
+        .divider {
+            width: 4px;
+            background: #3c3c3c;
+            cursor: col-resize;
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+
+        .divider:hover,
+        .divider.dragging {
+            background: #007acc;
+        }
+
+        /* ── Right panel ── */
+        .panel-right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .panel-right-header {
+            background: #252526;
+            color: #cccccc;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 6px 10px;
+            border-bottom: 1px solid #3c3c3c;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            user-select: none;
+        }
+
+        .status-circle {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: auto;
+            flex-shrink: 0;
+            transition: background 0.4s, box-shadow 0.4s;
+        }
+
+        .status-circle.online {
+            background: #28a745;
+            box-shadow: 0 0 6px #28a74580;
+        }
+
+        .status-circle.offline {
+            background: #dc3545;
+            box-shadow: 0 0 6px #dc354580;
+        }
+
+        .panel-right-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1e1e1e;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #3c3c3c;
+        }
+
+        .empty-state svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 12px;
+            opacity: 0.3;
+        }
+
+        .empty-state p {
+            font-size: 13px;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container" id="container">
+
+        <!-- Left Panel -->
+        <div class="panel-left" id="panelLeft">
+            <div class="panel-header">
+                <!-- House button + Run button -->
+                <button class="btn-house" id="btnHouse" title="Select folder">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
+                        <path d="M9 21V12h6v9" />
+                    </svg>
+                </button>
+                <button class="btn-run" id="btnRun">▶ Run</button>
+
+                <!-- Selected path (empty if none) -->
+                <span class="path-display" id="pathDisplay"></span>
+            </div>
+            <div id="monaco-editor"></div>
+        </div>
+
+        <!-- Draggable divider -->
+        <div class="divider" id="divider"></div>
+
+        <!-- Right Panel -->
+        <div class="panel-right" id="panelRight">
+            <div class="panel-right-header">
+                <span class="dot" style="background:#444"></span>
+                Result
+                <!-- Server status circle -->
+                <div class="status-circle" id="statusCircle" title="Server status"></div>
+            </div>
+            <div class="panel-right-content">
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <line x1="12" y1="8" x2="12" y2="16" />
+                        <line x1="8" y1="12" x2="16" y2="12" />
+                    </svg>
+                    <p>Coming soon</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+    <script>
+        const vscode = acquireVsCodeApi();
+
+        // ── Server status circle ──
+        let server = false;
+        const statusCircle = document.getElementById('statusCircle');
+
+        function applyServerStatus(val) {
+            statusCircle.className = 'status-circle ' + (val ? 'online' : 'offline');
+        }
+        applyServerStatus(server);
+
+        // Listen for status updates from the extension host
+        window.addEventListener('message', event => {
+            const msg = event.data;
+            if (msg.command === 'setServerStatus') {
+                server = msg.value;
+                applyServerStatus(server);
+            }
+            if (msg.command === 'setPath') {
+                document.getElementById('pathDisplay').textContent = msg.path;
+            }
+        });
+
+        // ── House button: open folder picker via extension host ──
+        document.getElementById('btnHouse').addEventListener('click', () => {
+            vscode.postMessage({ command: 'openFolder' });
+        });
+
+        // ── Run button ──
+        document.getElementById('btnRun').addEventListener('click', () => {
+            vscode.postMessage({ command: 'run' });
+        });
+
+        // ── Monaco Editor ──
+        require.config({
+            paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }
+        });
+        require(['vs/editor/editor.main'], function () {
+            const editor = monaco.editor.create(document.getElementById('monaco-editor'), {
+                value: '// Write your code here\\n',
+                language: 'javascript',
+                theme: 'vs-dark',
+                fontSize: 14,
+                minimap: { enabled: true },
+                automaticLayout: true,
+                scrollBeyondLastLine: false,
+                lineNumbers: 'on',
+                glyphMargin: false,
+                folding: true,
+                lineDecorationsWidth: 10,
+                lineNumbersMinChars: 3,
+            });
+
+            editor.onDidChangeModelContent(() => {
+                vscode.postMessage({ command: 'editorContent', text: editor.getValue() });
+            });
+        });
+
+        const divider = document.getElementById('divider');
+        const container = document.getElementById('container');
+        const panelLeft = document.getElementById('panelLeft');
+        const panelRight = document.getElementById('panelRight');
+        let isDragging = false;
+
+        divider.addEventListener('mousedown', () => {
+            isDragging = true;
+            divider.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+        document.addEventListener('mousemove', e => {
+            if (!isDragging) return;
+            const rect = container.getBoundingClientRect();
+            const offset = Math.max(200, Math.min(e.clientX - rect.left, rect.width - 200));
+            const pct = (offset / rect.width) * 100;
+            panelLeft.style.flex = 'none';
+            panelLeft.style.width = pct + '%';
+            panelRight.style.flex = 'none';
+            panelRight.style.width = (100 - pct) + '%';
+        });
+        document.addEventListener('mouseup', () => {
+            if (!isDragging) return;
+            isDragging = false;
+            divider.classList.remove('dragging');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        });
+    </script>
+
+</body>
+
+</html>

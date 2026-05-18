@@ -34,13 +34,91 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
+var vscode2 = __toESM(require("vscode"));
+
+// src/panelProvider.ts
 var vscode = __toESM(require("vscode"));
+var fs = __toESM(require("fs"));
+var path = __toESM(require("path"));
+var PanelProvider = class _PanelProvider {
+  static currentPanel;
+  _panel;
+  _extensionUri;
+  _disposables = [];
+  static createOrShow(extensionUri) {
+    const column = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.viewColumn : void 0;
+    if (_PanelProvider.currentPanel) {
+      _PanelProvider.currentPanel._panel.reveal(column);
+      return;
+    }
+    const panel = vscode.window.createWebviewPanel(
+      "Laravelgohu",
+      "Laravel Gohu",
+      column || vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [extensionUri]
+      }
+    );
+    _PanelProvider.currentPanel = new _PanelProvider(panel, extensionUri);
+  }
+  constructor(panel, extensionUri) {
+    this._panel = panel;
+    this._extensionUri = extensionUri;
+    this._panel.webview.html = this._getHtmlContent();
+    this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+    this._panel.webview.onDidReceiveMessage(
+      async (message) => {
+        switch (message.command) {
+          case "openFolder": {
+            const uris = await vscode.window.showOpenDialog({
+              canSelectFolders: true,
+              canSelectFiles: false,
+              canSelectMany: false,
+              openLabel: "Select folder"
+            });
+            if (uris && uris.length > 0) {
+              const folderPath = uris[0].fsPath;
+              this._panel.webview.postMessage({ command: "setPath", path: folderPath });
+            }
+            break;
+          }
+          case "run":
+            console.log("Run code.");
+            break;
+          case "editorContent":
+            console.log("Editor content:", message.text);
+            break;
+        }
+      },
+      null,
+      this._disposables
+    );
+  }
+  dispose() {
+    _PanelProvider.currentPanel = void 0;
+    this._panel.dispose();
+    while (this._disposables.length) {
+      const disposable = this._disposables.pop();
+      if (disposable) {
+        disposable.dispose();
+      }
+    }
+  }
+  _getHtmlContent() {
+    const htmlPath = path.join(this._extensionUri.fsPath, "src", "webview", "panel.html");
+    return fs.readFileSync(htmlPath, "utf8");
+  }
+};
+
+// src/extension.ts
 function activate(context) {
-  console.log('Congratulations, your extension "victorpenia" is now active!');
-  const disposable = vscode.commands.registerCommand("victorpenia.helloWorld", () => {
-    vscode.window.showInformationMessage("Hello World from gohu!");
-  });
-  context.subscriptions.push(disposable);
+  context.subscriptions.push(
+    vscode2.commands.registerCommand("gohu.openPanel", () => {
+      PanelProvider.createOrShow(context.extensionUri);
+    })
+  );
 }
 function deactivate() {
 }
