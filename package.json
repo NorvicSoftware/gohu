@@ -25,6 +25,11 @@
           "type": "string",
           "default": "",
           "description": "projecturl"
+        },
+        "laravelTools.phpBinary": {
+          "type": "string",
+          "default": "php",
+          "description": "Path to the PHP binary used to run Artisan commands. Defaults to `php` from your PATH (works with Laravel Herd/Valet). On Windows + XAMPP set the full path, e.g. C:\\\\xampp\\\\php\\\\php.exe"
         }
       }
     }

@@ -132,6 +132,7 @@
         }
 
         .panel-right-header {
+            position: relative;
             background: #252526;
             color: #cccccc;
             font-size: 11px;
@@ -147,12 +148,20 @@
         }
 
         .status-circle {
-            width: 10px;
-            height: 10px;
+            width: 12px;
+            height: 12px;
+            padding: 0;
+            border: none;
             border-radius: 50%;
             margin-left: auto;
             flex-shrink: 0;
+            cursor: pointer;
+            background: #555;
             transition: background 0.4s, box-shadow 0.4s;
+        }
+
+        .status-circle:hover {
+            box-shadow: 0 0 0 3px #ffffff1a;
         }
 
         .status-circle.online {
@@ -163,6 +172,117 @@
         .status-circle.offline {
             background: #dc3545;
             box-shadow: 0 0 6px #dc354580;
+        }
+
+        .status-circle.checking {
+            background: #e0a800;
+            box-shadow: 0 0 6px #e0a80080;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.35; }
+        }
+
+        /* ── Server status popover ── */
+        .status-popover {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 8px;
+            z-index: 50;
+            width: 300px;
+            background: #252526;
+            border: 1px solid #3c3c3c;
+            border-radius: 6px;
+            box-shadow: 0 6px 20px #00000066;
+            color: #cccccc;
+            text-transform: none;
+            letter-spacing: normal;
+            font-weight: 400;
+            overflow: hidden;
+        }
+
+        .status-popover[hidden] {
+            display: none;
+        }
+
+        .status-popover-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            border-bottom: 1px solid #3c3c3c;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-popover-header .title-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+            vertical-align: middle;
+            background: #555;
+        }
+
+        .status-popover-header .title-dot.online { background: #28a745; }
+        .status-popover-header .title-dot.offline { background: #dc3545; }
+        .status-popover-header .title-dot.checking { background: #e0a800; }
+
+        .status-recheck {
+            background: transparent;
+            border: 1px solid #3c3c3c;
+            color: #ccc;
+            padding: 2px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .status-recheck:hover {
+            border-color: #007acc;
+            background: #2a2d2e;
+        }
+
+        .status-popover-body {
+            padding: 8px 10px;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .status-row {
+            display: flex;
+            gap: 8px;
+            padding: 2px 0;
+        }
+
+        .status-row .label {
+            color: #8a8a8a;
+            min-width: 84px;
+            flex-shrink: 0;
+        }
+
+        .status-row .value {
+            color: #dddddd;
+            word-break: break-all;
+        }
+
+        .status-error {
+            margin-top: 6px;
+            padding: 8px;
+            background: #dc35451a;
+            border: 1px solid #dc354540;
+            border-radius: 4px;
+            color: #f1a5ad;
+            font-family: 'Consolas', 'Menlo', monospace;
+            font-size: 11px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 160px;
+            overflow: auto;
         }
 
         .panel-right-content {
@@ -223,8 +343,18 @@
             <div class="panel-right-header">
                 <span class="dot" style="background:#444"></span>
                 Result
-                <!-- Server status circle -->
-                <div class="status-circle" id="statusCircle" title="Server status"></div>
+                <!-- Server status button -->
+                <button class="status-circle" id="statusCircle" title="Server status — click for details"
+                    aria-label="Server status" aria-haspopup="true" aria-expanded="false"></button>
+
+                <!-- Server status details popover -->
+                <div class="status-popover" id="statusPopover" hidden>
+                    <div class="status-popover-header">
+                        <span><span class="title-dot" id="popoverDot"></span><span id="popoverTitle">Checking…</span></span>
+                        <button class="status-recheck" id="statusRecheck">Re-check</button>
+                    </div>
+                    <div class="status-popover-body" id="statusPopoverBody"></div>
+                </div>
             </div>
             <div class="panel-right-content">
                 <div class="empty-state">
@@ -244,26 +374,104 @@
     <script>
         const vscode = acquireVsCodeApi();
 
-        // ── Server status circle ──
-        let server = false;
+        // ── Server status ──
         const statusCircle = document.getElementById('statusCircle');
+        const statusPopover = document.getElementById('statusPopover');
+        const popoverDot = document.getElementById('popoverDot');
+        const popoverTitle = document.getElementById('popoverTitle');
+        const statusPopoverBody = document.getElementById('statusPopoverBody');
 
-        function applyServerStatus(val) {
-            statusCircle.className = 'status-circle ' + (val ? 'online' : 'offline');
+        let currentStatus = 'checking'; // 'online' | 'offline' | 'checking'
+        let currentDetails = null;
+
+        const STATUS_LABEL = {
+            online: 'Server online',
+            offline: 'Server offline',
+            checking: 'Checking…'
+        };
+
+        function applyServerStatus(status) {
+            currentStatus = status;
+            statusCircle.className = 'status-circle ' + status;
+            popoverDot.className = 'title-dot ' + status;
+            popoverTitle.textContent = STATUS_LABEL[status] || status;
+            renderDetails();
         }
-        applyServerStatus(server);
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function row(label, value) {
+            return '<div class="status-row"><span class="label">' + label +
+                '</span><span class="value">' + escapeHtml(value) + '</span></div>';
+        }
+
+        function renderDetails() {
+            if (currentStatus === 'checking') {
+                statusPopoverBody.innerHTML = '<div class="status-row"><span class="value">Checking connection…</span></div>';
+                return;
+            }
+            const d = currentDetails || {};
+            let html = '';
+            html += row('Project', d.projectPath || '— none selected —');
+            html += row('Laravel', d.laravelDetected ? 'detected ✓' : 'not detected ✗');
+            html += row('PHP', d.phpVersion ? (d.phpVersion + '  (' + (d.phpBinary || 'php') + ')') : (d.phpBinary || 'php'));
+            if (currentStatus === 'online') {
+                html += row('Connection', d.connection || '—');
+                html += row('Driver', d.driver || '—');
+                html += row('Database', d.database || '—');
+            }
+            if (d.error) {
+                html += '<div class="status-error">' + escapeHtml(d.error) + '</div>';
+            }
+            statusPopoverBody.innerHTML = html;
+        }
+
+        function togglePopover(force) {
+            const show = typeof force === 'boolean' ? force : statusPopover.hidden;
+            statusPopover.hidden = !show;
+            statusCircle.setAttribute('aria-expanded', String(show));
+        }
+
+        applyServerStatus('checking');
 
         // Listen for status updates from the extension host
         window.addEventListener('message', event => {
             const msg = event.data;
             if (msg.command === 'setServerStatus') {
-                server = msg.value;
-                applyServerStatus(server);
+                if (msg.details !== undefined) {
+                    currentDetails = msg.details;
+                }
+                applyServerStatus(msg.status);
             }
             if (msg.command === 'setPath') {
                 document.getElementById('pathDisplay').textContent = msg.path;
             }
         });
+
+        // ── Status button: toggle details popover ──
+        statusCircle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            togglePopover();
+        });
+
+        // Re-check button inside the popover
+        document.getElementById('statusRecheck').addEventListener('click', (e) => {
+            e.stopPropagation();
+            vscode.postMessage({ command: 'checkStatus' });
+        });
+
+        // Close the popover when clicking outside of it
+        document.addEventListener('click', (e) => {
+            if (!statusPopover.hidden && !statusPopover.contains(e.target) && e.target !== statusCircle) {
+                togglePopover(false);
+            }
+        });
+
+        // Ask the host to run the initial connection check
+        vscode.postMessage({ command: 'ready' });
 
         // ── House button: open folder picker via extension host ──
         document.getElementById('btnHouse').addEventListener('click', () => {

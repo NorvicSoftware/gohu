@@ -40,11 +40,15 @@ var vscode2 = __toESM(require("vscode"));
 var vscode = __toESM(require("vscode"));
 var fs = __toESM(require("fs"));
 var path = __toESM(require("path"));
+var import_child_process = require("child_process");
+var import_util = require("util");
+var execAsync = (0, import_util.promisify)(import_child_process.exec);
 var PanelProvider = class _PanelProvider {
   static currentPanel;
   _panel;
   _extensionUri;
   _disposables = [];
+  _projectPath;
   static createOrShow(extensionUri) {
     const column = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.viewColumn : void 0;
     if (_PanelProvider.currentPanel) {
@@ -67,10 +71,17 @@ var PanelProvider = class _PanelProvider {
     this._panel = panel;
     this._extensionUri = extensionUri;
     this._panel.webview.html = this._getHtmlContent();
+    const configured = vscode.workspace.getConfiguration("laravelTools").get("projectPath");
+    this._projectPath = configured && configured.trim() ? configured.trim() : void 0;
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
     this._panel.webview.onDidReceiveMessage(
       async (message) => {
         switch (message.command) {
+          case "ready":
+          case "checkStatus": {
+            await this._refreshServerStatus();
+            break;
+          }
           case "openFolder": {
             const uris = await vscode.window.showOpenDialog({
               canSelectFolders: true,
@@ -79,22 +90,103 @@ var PanelProvider = class _PanelProvider {
               openLabel: "Select folder"
             });
             if (uris && uris.length > 0) {
-              const folderPath = uris[0].fsPath;
-              this._panel.webview.postMessage({ command: "setPath", path: folderPath });
+              this._projectPath = uris[0].fsPath;
+              this._panel.webview.postMessage({ command: "setPath", path: this._projectPath });
+              await this._refreshServerStatus();
             }
             break;
           }
-          case "run":
+          case "run": {
             console.log("Run code.");
             break;
-          case "editorContent":
+          }
+          case "editorContent": {
             console.log("Editor content:", message.text);
             break;
+          }
         }
       },
       null,
       this._disposables
     );
+  }
+  _phpBinary() {
+    const bin = vscode.workspace.getConfiguration("laravelTools").get("phpBinary");
+    return bin && bin.trim() ? bin.trim() : "php";
+  }
+  /** Runs the connection check and pushes the result to the webview. */
+  async _refreshServerStatus() {
+    this._panel.webview.postMessage({ command: "setServerStatus", status: "checking" });
+    const details = await this._checkServerStatus();
+    this._panel.webview.postMessage({
+      command: "setServerStatus",
+      status: details.error ? "offline" : "online",
+      details
+    });
+  }
+  /**
+   * Checks whether a working Laravel/PHP environment with a reachable database
+   * exists for the selected project. Works with any local stack (Laravel Herd,
+   * XAMPP, Valet, ...) as long as the PHP binary can run.
+   *
+   * "Server online" = PHP boots + Laravel boots + the DB connection responds.
+   */
+  async _checkServerStatus() {
+    const phpBinary = this._phpBinary();
+    const projectPath = this._projectPath;
+    const details = {
+      projectPath,
+      laravelDetected: false,
+      phpBinary
+    };
+    if (!projectPath) {
+      details.error = "No project folder selected.";
+      return details;
+    }
+    if (!fs.existsSync(path.join(projectPath, "artisan"))) {
+      details.error = 'Not a Laravel project: "artisan" was not found in the selected folder.';
+      return details;
+    }
+    details.laravelDetected = true;
+    const script = "DB::connection()->getPdo();echo json_encode(['php_version'=>PHP_VERSION,'connection'=>DB::connection()->getName(),'driver'=>DB::connection()->getDriverName(),'database'=>DB::connection()->getDatabaseName()]);";
+    try {
+      const { stdout } = await execAsync(
+        `${phpBinary} artisan tinker --execute="${script}"`,
+        { cwd: projectPath, timeout: 15e3, windowsHide: true }
+      );
+      const json = this._extractJson(stdout);
+      if (!json) {
+        details.error = "Could not read the database status from the Artisan output.";
+        return details;
+      }
+      details.phpVersion = json.php_version;
+      details.connection = json.connection;
+      details.driver = json.driver;
+      details.database = json.database;
+      return details;
+    } catch (err) {
+      details.error = this._cleanError(err);
+      return details;
+    }
+  }
+  /** Extracts the first JSON object from the output (tinker may add extra text). */
+  _extractJson(output) {
+    const start = output.indexOf("{");
+    const end = output.lastIndexOf("}");
+    if (start === -1 || end === -1 || end < start) {
+      return void 0;
+    }
+    try {
+      return JSON.parse(output.slice(start, end + 1));
+    } catch {
+      return void 0;
+    }
+  }
+  _cleanError(err) {
+    const e = err;
+    const raw = (e?.stderr || e?.stdout || e?.message || "Unknown error").toString();
+    const trimmed = raw.trim().slice(0, 600);
+    return trimmed || "Unknown error";
   }
   dispose() {
     _PanelProvider.currentPanel = void 0;
