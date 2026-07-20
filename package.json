@@ -1,7 +1,7 @@
 {
-  "name": "victorpenia",
-  "displayName": "gohu",
-  "description": "Tool to execute Eloquent and Query Builder queries in Laravel applications.",
+  "name": "laravel-gohu",
+  "displayName": "Laravel Gohu",
+  "description": "Laravel Gohu is a VS Code extension that lets you run Eloquent and Query Builder queries directly against your application and get instant results in JSON format.",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.109.0"
