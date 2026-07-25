@@ -395,7 +395,7 @@ function gohu_returnable($code) {
     }
 
     private _getHtmlContent(): string {
-        const htmlPath = path.join(this._extensionUri.fsPath, 'src', 'webview', 'panel.html');
+        const htmlPath = path.join(this._extensionUri.fsPath, 'media', 'panel.html');
         return fs.readFileSync(htmlPath, 'utf8');
     }
 }
