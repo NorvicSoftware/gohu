@@ -116,6 +116,14 @@ export class PanelProvider {
         return bin && bin.trim() ? bin.trim() : 'php';
     }
 
+    /** Minimum times a query must repeat to be flagged as an N+1 (default 3). */
+    private _nPlusOneThreshold(): number {
+        const n = vscode.workspace
+            .getConfiguration('laravelTools')
+            .get<number>('nPlusOneThreshold');
+        return typeof n === 'number' && n >= 2 ? Math.floor(n) : 3;
+    }
+
     /** Runs the connection check and pushes the result to the webview. */
     private async _refreshServerStatus() {
         this._panel.webview.postMessage({ command: 'setServerStatus', status: 'checking' });
@@ -273,9 +281,17 @@ export class PanelProvider {
     private _writeRunnerScript(code: string): string {
         // Random Nowdoc delimiter so it never collides with a line of user code.
         const delim = 'GOHU_' + Math.random().toString(36).slice(2, 14).toUpperCase();
+        const threshold = this._nPlusOneThreshold();
 
         const runner = `<?php
 $__gohu_start = microtime(true);
+
+// Capture every SQL statement the snippet runs (for db_time + N+1 detection).
+$__gohu_q = [];
+\\Illuminate\\Support\\Facades\\DB::listen(function ($__gohu_ev) use (&$__gohu_q) {
+    $__gohu_q[] = ['sql' => $__gohu_ev->sql, 'time' => $__gohu_ev->time];
+});
+
 try {
     $__gohu_code = <<<'${delim}'
 ${code}
@@ -289,7 +305,7 @@ ${delim};
         $__gohu_result = $__gohu_result->get();
     }
 
-    // Elapsed time of the actual query execution, in milliseconds.
+    // Total wall-clock time of the whole snippet (PHP + connection + DB + hydration).
     $__gohu_ms = round((microtime(true) - $__gohu_start) * 1000, 2);
 
     $__gohu_limit = 20;
@@ -310,19 +326,44 @@ ${delim};
 
     $__gohu_conn = \\Illuminate\\Support\\Facades\\DB::connection();
 
+    // Build the queries block: total DB time + N+1 detection (same SQL repeated).
+    $__gohu_db_time = 0.0;
+    $__gohu_groups = [];
+    foreach ($__gohu_q as $__gohu_row) {
+        $__gohu_db_time += $__gohu_row['time'];
+        $__gohu_groups[$__gohu_row['sql']] = ($__gohu_groups[$__gohu_row['sql']] ?? 0) + 1;
+    }
+    $__gohu_queries = [
+        'detected_N+1' => false,
+        'count' => count($__gohu_q),
+        'db_time' => round($__gohu_db_time, 2) . ' ms',
+    ];
+    if ($__gohu_groups) {
+        arsort($__gohu_groups);
+        $__gohu_top_sql = array_key_first($__gohu_groups);
+        if ($__gohu_groups[$__gohu_top_sql] >= ${threshold}) {
+            $__gohu_queries['detected_N+1'] = true;
+            $__gohu_queries['n_plus_one'] = [
+                'sql' => $__gohu_top_sql,
+                'times' => $__gohu_groups[$__gohu_top_sql],
+            ];
+        }
+    }
+
     echo json_encode([
         'success' => true,
         'total' => $__gohu_total,
-        'query_time' => $__gohu_ms . ' ms',
+        'total_time' => $__gohu_ms . ' ms',
         'database' => $__gohu_conn->getDatabaseName(),
         'connection_name' => $__gohu_conn->getName(),
+        'queries' => $__gohu_queries,
         'data' => $__gohu_data,
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } catch (\\Throwable $__gohu_e) {
     echo json_encode([
         'success' => false,
         'error' => $__gohu_e->getMessage(),
-        'query_time' => round((microtime(true) - $__gohu_start) * 1000, 2) . ' ms',
+        'total_time' => round((microtime(true) - $__gohu_start) * 1000, 2) . ' ms',
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }
 
