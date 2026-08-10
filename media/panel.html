@@ -576,7 +576,10 @@
         });
         require(['vs/editor/editor.main'], function () {
             editor = monaco.editor.create(document.getElementById('monaco-editor'), {
-                value: '// write code',
+                value: `<?php
+
+// write code
+`,
                 language: 'php',
                 theme: 'vs-dark',
                 fontSize: 14,

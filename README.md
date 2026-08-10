@@ -10,7 +10,8 @@ Laravel Gohu opens a panel with a code editor on the left and a live result view
 
 - 🧩 **Eloquent & Query Builder** — run any snippet, from `User::get()` to complex `DB::table(...)` chains.
 - ⚡ **Instant JSON results** — total count, execution time, database and connection name, plus the first rows of data.
-- ✍️ **Monaco editor** — the same editor that powers VS Code, with a draggable split between code and results.
+- 🔎 **Query analysis & N+1 detection** — see how many SQL statements ran and the pure database time, and get an automatic warning when the same query repeats (a classic N+1 problem).
+- ✍️ **Monaco editor** — the same editor that powers VS Code, with PHP syntax highlighting and a draggable split between code and results.
 - 🟢 **Server status indicator** — a colored dot tells you at a glance whether PHP boots, Laravel loads and the database is reachable. Click it for the full details.
 - 🐘 **Any PHP stack** — works with Laravel Herd, Valet or XAMPP; just point it at your PHP binary.
 - 🔤 **Short model names** — `User::get()` resolves just like in an interactive `php artisan tinker`, no full namespaces required.
@@ -41,9 +42,10 @@ Result:
 {
     "success": true,
     "total": 160,
-    "query_time": "12.94 ms",
+    "total_time": "12.94 ms",
     "database": "my_app",
     "connection_name": "mysql",
+    "queries": { "detected_N+1": false, "count": 1, "db_time": "5.80 ms" },
     "data": [
         { "id": 1, "name": "Ada Lovelace", "email": "ada@example.com" }
     ]
@@ -51,6 +53,9 @@ Result:
 ```
 
 The last expression of your snippet is the result. You can also write an explicit `return`. `data` is capped at the first **20 rows** to keep the view fast, while `total` always reflects the full count.
+
+- **`total_time`** is the whole snippet's wall-clock time; **`queries.db_time`** is the database-only time.
+- When the same SQL statement repeats (by default 3+ times), `queries.detected_N+1` turns `true` and adds an `n_plus_one` object with the offending query — a quick way to catch and fix N+1 problems.
 
 ## Server status
 
@@ -70,6 +75,7 @@ Click the dot to open a popover with the PHP version, connection, driver and dat
 |---------|---------|-------------|
 | `laravelTools.projectPath` | `""` | Path to the Laravel project. Set automatically when you pick a folder. |
 | `laravelTools.phpBinary` | `php` | PHP binary used to run Artisan. Uses your `PATH` by default (Herd/Valet). On Windows + XAMPP, set the full path, e.g. `C:\xampp\php\php.exe`. |
+| `laravelTools.nPlusOneThreshold` | `3` | How many times the same SQL query must repeat within a run before it is flagged as a potential N+1. |
 
 ## Commands
 

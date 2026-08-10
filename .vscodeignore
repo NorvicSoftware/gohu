@@ -3,7 +3,11 @@
 out/**
 node_modules/**
 src/**
+landing/**
+CLAUDE.md
+pnpm-lock.yaml
 .gitignore
+.npmrc
 .yarnrc
 esbuild.js
 vsc-extension-quickstart.md
