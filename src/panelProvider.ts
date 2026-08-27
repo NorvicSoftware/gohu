@@ -99,6 +99,14 @@ export class PanelProvider {
                         await this._runQuery(typeof message.text === 'string' ? message.text : '');
                         break;
                     }
+                    case 'scanNPlusOne': {
+                        await this._scanNPlusOne();
+                        break;
+                    }
+                    case 'openFile': {
+                        await this._openFile(message.file, message.line);
+                        break;
+                    }
                     case 'editorContent': {
                         break;
                     }
@@ -220,6 +228,57 @@ export class PanelProvider {
         this._panel.webview.postMessage({ command: 'queryRunning' });
         const result = await this._executeQuery(code);
         this._panel.webview.postMessage({ command: 'queryResult', result });
+    }
+
+    /**
+     * Scans the selected Laravel project for likely N+1 query patterns (static analysis)
+     * and pushes the JSON findings to the webview. Runs the bundled `media/n1-scanner.php`
+     * with the project's own Composer autoload (which provides nikic/php-parser via Tinker).
+     */
+    private async _scanNPlusOne() {
+        const projectPath = this._projectPath;
+        if (!projectPath) {
+            this._panel.webview.postMessage({ command: 'scanResult', result: { success: false, error: 'No project folder selected.' } });
+            return;
+        }
+        if (!fs.existsSync(path.join(projectPath, 'artisan'))) {
+            this._panel.webview.postMessage({ command: 'scanResult', result: { success: false, error: 'Not a Laravel project: "artisan" was not found in the selected folder.' } });
+            return;
+        }
+
+        this._panel.webview.postMessage({ command: 'scanRunning' });
+
+        const phpBinary = this._phpBinary();
+        const scanner = path.join(this._extensionUri.fsPath, 'media', 'n1-scanner.php').replace(/\\/g, '/');
+        const proj = projectPath.replace(/\\/g, '/');
+
+        try {
+            const { stdout } = await execAsync(
+                `${phpBinary} "${scanner}" "${proj}" "${proj}/vendor/autoload.php"`,
+                { cwd: projectPath, timeout: 90000, windowsHide: true, maxBuffer: 32 * 1024 * 1024 }
+            );
+            const json = this._extractJson(stdout);
+            const result = json || { success: false, error: 'Could not parse the scan output.\n\n' + stdout.trim().slice(0, 1000) };
+            this._panel.webview.postMessage({ command: 'scanResult', result });
+        } catch (err) {
+            this._panel.webview.postMessage({ command: 'scanResult', result: { success: false, error: this._cleanError(err) } });
+        }
+    }
+
+    /** Opens a project file at a given line (used when clicking a scan finding). */
+    private async _openFile(file: unknown, line: unknown) {
+        if (!this._projectPath || typeof file !== 'string') { return; }
+        const abs = path.isAbsolute(file) ? file : path.join(this._projectPath, file);
+        try {
+            const doc = await vscode.workspace.openTextDocument(abs);
+            const editor = await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
+            const ln = Math.max(0, (typeof line === 'number' ? line : 1) - 1);
+            const pos = new vscode.Position(ln, 0);
+            editor.selection = new vscode.Selection(pos, pos);
+            editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
+        } catch {
+            vscode.window.showWarningMessage('Laravel Gohu: could not open ' + abs);
+        }
     }
 
     /**

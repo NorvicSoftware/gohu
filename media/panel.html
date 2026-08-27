@@ -92,6 +92,124 @@
             background: #22923c;
         }
 
+        .btn-scan {
+            background: #dc3545;
+            border: none;
+            color: #fff;
+            padding: 3px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            transition: background 0.2s;
+        }
+
+        .btn-scan:hover { background: #c22030; }
+        .btn-scan:disabled { opacity: 0.55; cursor: default; }
+
+        /* ── N+1 scan overlay ── */
+        .scan-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            background: #1e1e1e;
+        }
+
+        .scan-overlay[hidden] { display: none; }
+
+        .scan-overlay-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #3c3c3c;
+            background: #252526;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #cdd9f5;
+        }
+
+        .scan-overlay-header .tag {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #dc3545;
+        }
+
+        .scan-close {
+            margin-left: auto;
+            background: transparent;
+            border: none;
+            color: #9fb0d4;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+
+        .scan-close:hover { background: rgba(255, 255, 255, 0.09); color: #fff; }
+
+        .scan-summary {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding: 10px 14px;
+            border-bottom: 1px solid #3c3c3c;
+            background: #252526;
+            font-size: 12px;
+            color: #cccccc;
+            flex-shrink: 0;
+        }
+
+        .scan-summary .big { font-size: 16px; font-weight: 700; }
+        .scan-summary .big.warn { color: #f1707b; }
+        .scan-summary .big.ok { color: #4ec46a; }
+        .scan-summary .muted { color: #8a8a8a; }
+
+        .scan-list { flex: 1; overflow: auto; padding: 6px; }
+
+        .finding {
+            padding: 9px 11px;
+            margin: 5px;
+            border: 1px solid #3c3c3c;
+            border-radius: 6px;
+            background: #232323;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+        }
+
+        .finding:hover { border-color: #7c5cff; background: #2a2733; }
+
+        .finding .top { display: flex; align-items: center; gap: 8px; }
+
+        .finding .loc { font-family: 'Consolas', 'Menlo', monospace; font-size: 12px; color: #9cdcfe; }
+
+        .finding .badge {
+            font-size: 9.5px;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 8px;
+            letter-spacing: 0.04em;
+        }
+
+        .finding .badge.high { background: #dc354533; color: #f1707b; }
+        .finding .badge.medium { background: #e0a80033; color: #f0c674; }
+
+        .finding .rel { margin-top: 5px; font-size: 12px; color: #dddddd; }
+        .finding .rel code { color: #ce9178; }
+        .finding .fix { margin-top: 3px; font-size: 11.5px; color: #6a9955; font-family: 'Consolas', 'Menlo', monospace; }
+
+        .scan-empty { padding: 26px; text-align: center; color: #4ec46a; font-size: 13px; }
+        .scan-empty.err { color: #f1707b; }
+
         .path-display {
             margin-left: auto;
             color: #6a9955;
@@ -286,6 +404,7 @@
         }
 
         .panel-right-content {
+            position: relative;
             flex: 1;
             display: flex;
             align-items: center;
@@ -326,6 +445,41 @@
         .header-loading[hidden] {
             display: none;
         }
+
+        /* ── N+1 chip (reopen last scan) ── */
+        .n1-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-left: 4px;
+            padding: 2px 5px 2px 9px;
+            border-radius: 11px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-transform: none;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: filter 0.15s;
+        }
+
+        .n1-chip[hidden] { display: none; }
+        .n1-chip:hover { filter: brightness(1.15); }
+        .n1-chip.warn { background: rgba(220, 53, 69, 0.16); color: #f1707b; border-color: rgba(220, 53, 69, 0.4); }
+        .n1-chip.ok { background: rgba(40, 167, 69, 0.16); color: #4ec46a; border-color: rgba(40, 167, 69, 0.4); }
+        .n1-chip .n1-chip-label { cursor: pointer; }
+
+        .n1-chip .n1-chip-x {
+            display: inline-grid;
+            place-items: center;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            font-size: 10px;
+            opacity: 0.7;
+        }
+
+        .n1-chip .n1-chip-x:hover { background: rgba(255, 255, 255, 0.16); opacity: 1; }
 
         .spinner-sm {
             width: 11px;
@@ -384,6 +538,7 @@
                     </svg>
                 </button>
                 <button class="btn-run" id="btnRun">▶ Run</button>
+                <button class="btn-scan" id="btnScan" title="Scan the whole project for N+1 query patterns">Detection N+1</button>
 
                 <!-- Selected path (empty if none) -->
                 <span class="path-display" id="pathDisplay"></span>
@@ -401,6 +556,11 @@
                 Result
                 <span class="header-loading" id="headerLoading" hidden>
                     <span class="spinner-sm"></span>Running…
+                </span>
+                <!-- N+1 chip: reopens the last scan findings without re-scanning -->
+                <span class="n1-chip" id="n1Chip" hidden>
+                    <span class="n1-chip-label" id="n1ChipLabel">N+1: 0</span>
+                    <span class="n1-chip-x" id="n1ChipX" title="Dismiss">✕</span>
                 </span>
                 <!-- Server status button -->
                 <button class="status-circle" id="statusCircle" title="Server status — click for details"
@@ -425,6 +585,14 @@
                 </div>
                 <div class="result-view" id="resultView" hidden>
                     <pre class="result-json" id="resultJson"></pre>
+                </div>
+                <div class="scan-overlay" id="scanOverlay" hidden>
+                    <div class="scan-overlay-header">
+                        <span class="tag"></span> N+1 Detection
+                        <button class="scan-close" id="scanClose" title="Close">✕</button>
+                    </div>
+                    <div class="scan-summary" id="scanSummary"></div>
+                    <div class="scan-list" id="scanList"></div>
                 </div>
             </div>
         </div>
@@ -503,11 +671,24 @@
         const resultView = document.getElementById('resultView');
         const resultJson = document.getElementById('resultJson');
         const headerLoading = document.getElementById('headerLoading');
+        const scanOverlay = document.getElementById('scanOverlay');
+        const scanSummary = document.getElementById('scanSummary');
+        const scanList = document.getElementById('scanList');
+        const btnScan = document.getElementById('btnScan');
+        const scanClose = document.getElementById('scanClose');
+        const n1Chip = document.getElementById('n1Chip');
+        const n1ChipLabel = document.getElementById('n1ChipLabel');
+        const n1ChipX = document.getElementById('n1ChipX');
 
         function showResultState(state) { // 'empty' | 'result'
             emptyState.hidden = state !== 'empty';
             resultView.hidden = state !== 'result';
         }
+
+        // The scan is an overlay: it covers the result without destroying it,
+        // and can be closed to reveal whatever query result was underneath.
+        function openScan() { scanOverlay.hidden = false; }
+        function closeScan() { scanOverlay.hidden = true; }
 
         function renderQueryResult(result) {
             const ok = !!(result && result.success);
@@ -515,6 +696,61 @@
             resultJson.textContent = JSON.stringify(result, null, 2);
             showResultState('result');
         }
+
+        // ── N+1 project scan ──
+        function renderScan(result) {
+            if (!result || !result.success) {
+                n1Chip.hidden = true;
+                scanSummary.innerHTML = '<span class="big warn">Error</span>';
+                scanList.innerHTML = '<div class="scan-empty err">' + escapeHtml(result && result.error ? result.error : 'Scan failed') + '</div>';
+                openScan();
+                return;
+            }
+            const n = result.total_detected || 0;
+            // Persistent chip in the header → reopen these findings anytime without re-scanning.
+            n1ChipLabel.textContent = 'N+1: ' + n;
+            n1Chip.className = 'n1-chip ' + (n ? 'warn' : 'ok');
+            n1Chip.hidden = false;
+            scanSummary.innerHTML =
+                '<span class="big ' + (n ? 'warn' : 'ok') + '">' + n + '</span>' +
+                '<span>N+1 ' + (n === 1 ? 'issue' : 'issues') + ' detected</span>' +
+                '<span class="muted">· scanned ' + (result.scanned_files || 0) + ' files</span>';
+            if (!n) {
+                scanList.innerHTML = '<div class="scan-empty">✓ No N+1 patterns found. Nice and clean!</div>';
+            } else {
+                scanList.innerHTML = (result.findings || []).map(function (f) {
+                    const conf = f.confidence === 'high' ? 'high' : 'medium';
+                    return '<div class="finding" data-file="' + escapeHtml(f.file) + '" data-line="' + (f.line || 1) + '">' +
+                        '<div class="top"><span class="badge ' + conf + '">' + conf.toUpperCase() + '</span>' +
+                        '<span class="loc">' + escapeHtml(f.file) + ':' + (f.line || '') + '</span></div>' +
+                        '<div class="rel"><code>' + escapeHtml(f.model) + '</code> · relation <code>' + escapeHtml(f.relation) + '</code> loaded inside a loop</div>' +
+                        '<div class="fix">💡 ' + escapeHtml(f.suggestion) + '</div>' +
+                        '</div>';
+                }).join('');
+            }
+            openScan();
+        }
+
+        // Click a finding → open the file at that line
+        scanList.addEventListener('click', function (e) {
+            const el = e.target.closest ? e.target.closest('.finding') : null;
+            if (!el) { return; }
+            vscode.postMessage({ command: 'openFile', file: el.getAttribute('data-file'), line: parseInt(el.getAttribute('data-line'), 10) || 1 });
+        });
+
+        btnScan.addEventListener('click', function () {
+            vscode.postMessage({ command: 'scanNPlusOne' });
+        });
+
+        scanClose.addEventListener('click', closeScan);
+
+        // Chip: label reopens the last findings; ✕ dismisses the chip entirely.
+        n1ChipLabel.addEventListener('click', openScan);
+        n1ChipX.addEventListener('click', function (e) {
+            e.stopPropagation();
+            n1Chip.hidden = true;
+            closeScan();
+        });
 
         // Listen for status/result updates from the extension host
         window.addEventListener('message', event => {
@@ -530,10 +766,21 @@
             }
             if (msg.command === 'queryRunning') {
                 headerLoading.hidden = false;
+                closeScan(); // running a query brings focus back to the result
             }
             if (msg.command === 'queryResult') {
                 headerLoading.hidden = true;
                 renderQueryResult(msg.result);
+            }
+            if (msg.command === 'scanRunning') {
+                btnScan.disabled = true;
+                scanSummary.innerHTML = '<span class="spinner-sm"></span> Scanning project for N+1…';
+                scanList.innerHTML = '';
+                openScan();
+            }
+            if (msg.command === 'scanResult') {
+                btnScan.disabled = false;
+                renderScan(msg.result);
             }
         });
 
