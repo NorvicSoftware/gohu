@@ -1,1 +1,4 @@
+node_modules/
+*.vsix
+.vscode-test/
 CLAUDE.md
