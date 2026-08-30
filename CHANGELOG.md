@@ -2,12 +2,16 @@
 
 All notable changes to the **Laravel Gohu** extension are documented in this file.
 
+## [0.0.5]
+
+### Added
+- **Project-wide N+1 scan.** The new **Detection N+1** button runs a **static, heuristic** scan of the whole project (controllers, actions, services, ...) and lists every likely N+1 with its file, line, model, relation and a suggested `with(...)` fix, plus a confidence level. Findings are clickable cards that jump to the exact line, shown in a closeable overlay with a header chip that reopens them without re-scanning.
+
 ## [0.0.4]
 
 ### Added
 - **Query performance analysis.** Every run now reports a `queries` block with the total number of SQL statements executed (`count`) and the pure database time (`db_time`).
 - **N+1 detection (runtime).** When the same SQL statement repeats within a single run, Laravel Gohu flags it as a potential N+1 problem (`detected_N+1`), including the offending query and how many times it ran.
-- **Project-wide N+1 scan.** The new "Detection N+1" button statically scans the whole project (controllers, actions, services, ...) for N+1 patterns and lists each finding with file, line, model, relation and a suggested `with(...)` fix. Findings are clickable and jump to the exact line.
 - New setting `laravelTools.nPlusOneThreshold` (default `3`) to tune when a repeated query is flagged.
 - PHP syntax highlighting in the editor.
 
